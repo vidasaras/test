@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC Voice Chat</title>
+</head>
+<body>
+  <h1>WebRTC Voice Chat</h1>
+  <p>Your User ID: <span id="userId"></span></p>
+  
+  <div id="callControls">
+    <label for="receiverId">Enter receiver's User ID:</label>
+    <input type="text" id="receiverId" placeholder="Receiver's User ID">
+    
+    <button id="startCallBtn" onclick="startCall()">Start Call</button>
+    <button id="endCallBtn" onclick="endCall()" disabled>End Call</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let localConnection;
+    let remoteConnection;
+    let localStream;
+    let remoteStream;
+    let localAudio = new Audio();
+    let remoteAudio = new Audio();
+    let userId;
+
+    // Get DOM elements
+    const startCallBtn = document.getElementById('startCallBtn');
+    const endCallBtn = document.getElementById('endCallBtn');
+
+    // Display the unique user ID
+    socket.on('userId', (id) => {
+      userId = id;
+      document.getElementById('userId').textContent = userId;
+    });
+
+    // Handle incoming offers
+    socket.on('offer', async (data) => {
+      if (data.senderId === userId) return; // Ignore offers from yourself
+      
+      // Ask user to accept the call
+      if (!confirm(`Incoming call from ${data.senderId}. Accept?`)) {
+        return;
+      }
+
+      try {
+        // Only request audio access when accepting a call
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localAudio.srcObject = localStream;
+        localAudio.play();
+
+        remoteConnection = new RTCPeerConnection();
+        
+        // Add local stream to connection
+        localStream.getTracks().forEach(track => {
+          remoteConnection.addTrack(track, localStream);
+        });
+
+        remoteConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await remoteConnection.createAnswer();
+        await remoteConnection.setLocalDescription(answer);
+        
+        socket.emit('answer', { 
+          answer: answer, 
+          receiverId: data.senderId 
+        });
+
+        remoteConnection.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit('candidate', { 
+              candidate: event.candidate, 
+              receiverId: data.senderId 
+            });
+          }
+        };
+
+        remoteConnection.ontrack = (event) => {
+          remoteStream = event.streams[0];
+          remoteAudio.srcObject = remoteStream;
+          remoteAudio.play();
+        };
+
+        endCallBtn.disabled = false;
+      } catch (error) {
+        console.error('Error handling offer:', error);
+        alert('Failed to establish call: ' + error.message);
+      }
+    });
+
+    socket.on('answer', (data) => {
+      if (data.receiverId === userId && localConnection) {
+        localConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      }
+    });
+
+    socket.on('candidate', (data) => {
+      const connection = localConnection || remoteConnection;
+      if (data.receiverId === userId && connection) {
+        connection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    });
+
+    async function startCall() {
+      const receiverId = document.getElementById('receiverId').value;
+      if (!receiverId) return alert('Please enter a receiver ID.');
+      
+      try {
+        // Request audio access only when starting a call
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localAudio.srcObject = localStream;
+        localAudio.play();
+
+        localConnection = new RTCPeerConnection();
+        
+        // Add local stream to connection
+        localStream.getTracks().forEach(track => {
+          localConnection.addTrack(track, localStream);
+        });
+
+        const offer = await localConnection.createOffer();
+        await localConnection.setLocalDescription(offer);
+        
+        socket.emit('offer', { 
+          offer: offer, 
+          senderId: userId, 
+          receiverId: receiverId 
+        });
+
+        localConnection.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit('candidate', { 
+              candidate: event.candidate, 
+              receiverId: receiverId 
+            });
+          }
+        };
+
+        localConnection.ontrack = (event) => {
+          remoteStream = event.streams[0];
+          remoteAudio.srcObject = remoteStream;
+          remoteAudio.play();
+        };
+
+        startCallBtn.disabled = true;
+        endCallBtn.disabled = false;
+      } catch (error) {
+        console.error('Error starting call:', error);
+        alert('Failed to start call: ' + error.message);
+      }
+    }
+
+    function endCall() {
+      if (localConnection) {
+        localConnection.close();
+        localConnection = null;
+      }
+      if (remoteConnection) {
+        remoteConnection.close();
+        remoteConnection = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localAudio.srcObject = null;
+      }
+      if (remoteStream) {
+        remoteStream.getTracks().forEach(track => track.stop());
+        remoteAudio.srcObject = null;
+      }
+
+      startCallBtn.disabled = false;
+      endCallBtn.disabled = true;
+    }
+  </script>
+</body>
+</html>
