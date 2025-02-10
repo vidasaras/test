@@ -112,7 +112,7 @@
         // Request audio access only when starting a call
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         localAudio.srcObject = localStream;
-        localAudio.play();
+        //localAudio.play();
 
         localConnection = new RTCPeerConnection();
         
