@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC Voice Chat</title>
+</head>
+<body>
+  <h1>WebRTC Voice Chat</h1>
+  <p>Your User ID: <span id="userId"></span></p>
+  
+  <div id="callControls">
+    <label for="receiverId">Enter receiver's User ID:</label>
+    <input type="text" id="receiverId" placeholder="Receiver's User ID">
+    
+    <button id="startCallBtn">Start Call</button>
+    <button id="endCallBtn" disabled>End Call</button>
+  </div>
+
+  <script type="module" src="/main.js"></script>
+</body>
+</html>
