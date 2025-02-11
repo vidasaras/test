@@ -1,5 +1,5 @@
 import { io } from 'socket.io-client';
-const socket = io('http://localhost:3000');
+const socket = io('https://d761589f-3c64-4061-896d-cf59a703b4e4-00-2knwrphuplpe8.worf.replit.dev/');
 let localConnection;
 let remoteConnection;
 let localStream;
